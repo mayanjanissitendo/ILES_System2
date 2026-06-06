@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
@@ -5,6 +6,8 @@ from .views import (
     EvaluationCriteriaViewSet,
     EvaluationViewSet,
     InternshipPlacementViewSet,
+    LoginView,
+    MeView,
     UserViewSet,
     WeeklyLogViewSet,
 )
@@ -17,4 +20,9 @@ router.register("evaluation-criteria", EvaluationCriteriaViewSet, basename="eval
 router.register("evaluations", EvaluationViewSet, basename="evaluations")
 router.register("dashboards", DashboardViewSet, basename="dashboards")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("auth/login/", LoginView.as_view(), name="auth-login"),
+    path("auth/me/", MeView.as_view(), name="auth-me"),
+]
+
+urlpatterns += router.urls
