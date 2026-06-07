@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "../services/api.js";
 
 const AuthContext = createContext(null);
@@ -9,6 +9,21 @@ export function AuthProvider({ children }) {
     const saved = localStorage.getItem("iles_user");
     return saved ? JSON.parse(saved) : null;
   });
+  const [checkingSession, setCheckingSession] = useState(Boolean(token));
+
+  useEffect(() => {
+    if (!token) {
+      setCheckingSession(false);
+      return;
+    }
+    api.get("auth/me/")
+      .then(({ data }) => {
+        setUser(data);
+        localStorage.setItem("iles_user", JSON.stringify(data));
+      })
+      .catch(() => logout())
+      .finally(() => setCheckingSession(false));
+  }, [token]);
 
   async function login(username, password) {
     const { data } = await api.post("auth/login/", { username, password });
@@ -25,7 +40,11 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
-  const value = useMemo(() => ({ token, user, login, logout, isAuthenticated: Boolean(token) }), [token, user]);
+  const value = useMemo(
+    () => ({ token, user, login, logout, checkingSession, isAuthenticated: Boolean(token) }),
+    [token, user, checkingSession]
+  );
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
