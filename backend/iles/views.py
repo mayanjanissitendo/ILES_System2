@@ -1,9 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import decorators, permissions, response, status, viewsets
 from rest_framework.exceptions import ValidationError
+from rest_framework.authtoken.models import Token
+from rest_framework.views import APIView
 
-from .models import Evaluation, EvaluationCriteria, InternshipPlacement, WeeklyLog, WorkflowStatusHistory
+from .models import Evaluation, EvaluationCriteria, InternshipPlacement, WeeklyLog
 from .permissions import IsSupervisorOrAdmin
 from .serializers import (
     DashboardSerializer,
@@ -14,10 +17,29 @@ from .serializers import (
     UserSerializer,
     WeeklyLogReviewSerializer,
     WeeklyLogSerializer,
-    WorkflowStatusHistorySerializer,
 )
 
 User = get_user_model()
+
+
+class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        user = authenticate(request, username=username, password=password)
+        if not user:
+            return response.Response({"detail": "Invalid username or password."}, status=status.HTTP_400_BAD_REQUEST)
+        token, _ = Token.objects.get_or_create(user=user)
+        return response.Response({"token": token.key, "user": UserSerializer(user).data})
+
+
+class MeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return response.Response(UserSerializer(request.user).data)
 
 
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -69,18 +91,10 @@ class WeeklyLogViewSet(viewsets.ModelViewSet):
         if log.placement.student != request.user:
             return response.Response({"detail": "Only the student can submit this log."}, status=status.HTTP_403_FORBIDDEN)
         try:
-            previous_status = log.status
             log.submit()
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages)
         log.save(update_fields=["status", "submitted_at", "updated_at"])
-        WorkflowStatusHistory.objects.create(
-            weekly_log=log,
-            from_status=previous_status,
-            to_status=log.status,
-            changed_by=request.user,
-            comment="Submitted by student",
-        )
         return response.Response(self.get_serializer(log).data)
 
     @decorators.action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated, IsSupervisorOrAdmin])
@@ -89,7 +103,6 @@ class WeeklyLogViewSet(viewsets.ModelViewSet):
         serializer = WeeklyLogReviewSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            previous_status = log.status
             log.review(
                 reviewer=request.user,
                 status=serializer.validated_data["status"],
@@ -98,20 +111,7 @@ class WeeklyLogViewSet(viewsets.ModelViewSet):
         except DjangoValidationError as exc:
             raise ValidationError(exc.messages)
         log.save(update_fields=["status", "supervisor_comments", "reviewed_by", "reviewed_at", "updated_at"])
-        WorkflowStatusHistory.objects.create(
-            weekly_log=log,
-            from_status=previous_status,
-            to_status=log.status,
-            changed_by=request.user,
-            comment=serializer.validated_data.get("comments", ""),
-        )
         return response.Response(self.get_serializer(log).data)
-
-    @decorators.action(detail=True, methods=["get"], url_path="history")
-    def history(self, request, pk=None):
-        log = self.get_object()
-        serializer = WorkflowStatusHistorySerializer(log.status_history.all(), many=True)
-        return response.Response(serializer.data)
 
 
 class EvaluationCriteriaViewSet(viewsets.ModelViewSet):

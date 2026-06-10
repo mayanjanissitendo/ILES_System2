@@ -1,6 +1,7 @@
 import { LogIn } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import loginInternshipImage from "../assets/login-internship.jpg";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Login() {
@@ -28,9 +29,9 @@ export default function Login() {
     <main className="grid min-h-screen bg-[#f7f8fb] lg:grid-cols-[1.05fr_0.95fr]">
       <section className="relative hidden overflow-hidden bg-cyan-700 lg:block">
         <img
-          alt="Students working during internship"
+          alt="Supervisor guiding interns during workplace training"
           className="h-full w-full object-cover opacity-90"
-          src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=80"
+          src={loginInternshipImage}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-cyan-950/20 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-xl text-white">
